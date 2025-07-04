@@ -7,6 +7,15 @@ interface TextExcerpt {
   created_at: string;
 }
 
+interface Annotation {
+  id: number;
+  start_index: number;
+  end_index: number;
+  selected_text: string;
+  comment: string;
+  created_at: string;
+}
+
 interface AdminDashboardProps {
   token: string;
   onLogout: () => void;
@@ -19,6 +28,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
   const [editingText, setEditingText] = useState<TextExcerpt | null>(null);
   const [formData, setFormData] = useState({ title: '', content: '' });
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [selectedTextForAnnotations, setSelectedTextForAnnotations] = useState<number | null>(null);
+  const [annotations, setAnnotations] = useState<Record<number, Annotation[]>>({});
+  const [loadingAnnotations, setLoadingAnnotations] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchTextExcerpts();
@@ -112,6 +124,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
 
   const cancelDelete = () => {
     setDeleteConfirm(null);
+  };
+
+  const fetchAnnotations = async (textId: number) => {
+    if (annotations[textId]) {
+      // Already have annotations for this text
+      return;
+    }
+
+    setLoadingAnnotations(prev => ({ ...prev, [textId]: true }));
+    try {
+      const response = await fetch(`http://localhost:3001/api/annotations/text/${textId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAnnotations(prev => ({ ...prev, [textId]: data }));
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error);
+    } finally {
+      setLoadingAnnotations(prev => ({ ...prev, [textId]: false }));
+    }
+  };
+
+  const toggleAnnotationsView = (textId: number) => {
+    if (selectedTextForAnnotations === textId) {
+      setSelectedTextForAnnotations(null);
+    } else {
+      setSelectedTextForAnnotations(textId);
+      fetchAnnotations(textId);
+    }
+  };
+
+  const deleteAnnotation = async (annotationId: number, textId: number) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/annotations/${annotationId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setAnnotations(prev => ({
+          ...prev,
+          [textId]: prev[textId]?.filter(ann => ann.id !== annotationId) || []
+        }));
+      }
+    } catch (error) {
+      console.error('Error deleting annotation:', error);
+    }
   };
 
   const startEdit = (text: TextExcerpt) => {
@@ -260,6 +318,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
                       </div>
                       <div className="flex gap-2 ml-4">
                         <button
+                          onClick={() => toggleAnnotationsView(text.id)}
+                          className="text-green-600 hover:text-green-800 text-sm font-medium"
+                        >
+                          {selectedTextForAnnotations === text.id ? 'Hide' : 'View'} Annotations
+                          {annotations[text.id] && ` (${annotations[text.id].length})`}
+                        </button>
+                        <button
                           onClick={() => startEdit(text)}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
@@ -273,6 +338,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
                         </button>
                       </div>
                     </div>
+                    
+                    {/* Annotations section */}
+                    {selectedTextForAnnotations === text.id && (
+                      <div className="mt-4 border-t pt-4">
+                        <h4 className="text-sm font-medium text-gray-900 mb-3">
+                          Annotations for "{text.title}"
+                        </h4>
+                        
+                        {loadingAnnotations[text.id] ? (
+                          <div className="flex items-center text-gray-500 text-sm">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                            Loading annotations...
+                          </div>
+                        ) : annotations[text.id]?.length === 0 ? (
+                          <div className="text-gray-500 text-sm italic">
+                            No annotations found for this text.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {annotations[text.id]
+                              ?.sort((a, b) => a.start_index - b.start_index)
+                              .map((annotation, index) => (
+                                <div 
+                                  key={annotation.id}
+                                  className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                                >
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                                        {index + 1}
+                                      </span>
+                                      <span className="text-xs text-gray-600">
+                                        Position {annotation.start_index}-{annotation.end_index}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => deleteAnnotation(annotation.id, text.id)}
+                                      className="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50"
+                                      title="Delete annotation"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="mb-2">
+                                    <div className="text-xs text-gray-600 mb-1">Selected text:</div>
+                                    <div className="bg-yellow-100 px-2 py-1 rounded text-sm font-medium text-gray-800">
+                                      "{annotation.selected_text}"
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <div className="text-xs text-gray-600 mb-1">Comment:</div>
+                                    <div className="text-sm text-gray-700">
+                                      {annotation.comment || <em className="text-gray-400">No comment</em>}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="text-xs text-gray-500 mt-2">
+                                    Created: {new Date(annotation.created_at).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
