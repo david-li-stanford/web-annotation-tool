@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 
 interface Annotation {
   id: number;
@@ -40,15 +40,11 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
-    const range = selection.getRangeAt(0);
     const selectedText = selection.toString().trim();
     
     if (selectedText.length === 0) return;
 
     // Calculate character indices in the original text
-    const startContainer = range.startContainer;
-    const endContainer = range.endContainer;
-    
     // Get text content before the selection
     const textElement = textRef.current;
     if (!textElement) return;
@@ -105,7 +101,20 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
     // Sort annotations by start index
     const sortedAnnotations = [...annotations].sort((a, b) => a.start_index - b.start_index);
     
-    let parts = [];
+    type TextPart = {
+      type: 'text';
+      content: string;
+      key: string;
+    };
+
+    type AnnotationPart = {
+      type: 'annotation';
+      content: string;
+      annotation: Annotation;
+      key: string;
+    };
+
+    let parts: (TextPart | AnnotationPart)[] = [];
     let lastIndex = 0;
 
     sortedAnnotations.forEach((annotation, index) => {
@@ -141,7 +150,7 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
     return parts.map((part) => {
       if (part.type === 'text') {
         return <span key={part.key}>{part.content}</span>;
-      } else {
+      } else if (part.type === 'annotation') {
         return (
           <span
             key={part.key}
@@ -153,6 +162,7 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
           </span>
         );
       }
+      return null;
     });
   };
 
