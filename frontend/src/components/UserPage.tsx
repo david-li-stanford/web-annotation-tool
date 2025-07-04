@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TextAnnotator from './TextAnnotator';
 
 interface TextExcerpt {
   id: number;
@@ -7,10 +8,21 @@ interface TextExcerpt {
   created_at: string;
 }
 
+interface Annotation {
+  id: number;
+  start_index: number;
+  end_index: number;
+  selected_text: string;
+  comment: string;
+  created_at: string;
+}
+
 const UserPage: React.FC = () => {
   const [textExcerpts, setTextExcerpts] = useState<TextExcerpt[]>([]);
   const [selectedText, setSelectedText] = useState<TextExcerpt | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [annotationsLoading, setAnnotationsLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -33,12 +45,94 @@ const UserPage: React.FC = () => {
     }
   };
 
-  const handleTextSelect = (text: TextExcerpt) => {
+  const handleTextSelect = async (text: TextExcerpt) => {
     setSelectedText(text);
+    await fetchAnnotations(text.id);
   };
 
   const handleBackToList = () => {
     setSelectedText(null);
+    setAnnotations([]);
+  };
+
+  const fetchAnnotations = async (textId: number) => {
+    setAnnotationsLoading(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/annotations/text/${textId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAnnotations(data);
+      } else {
+        console.error('Failed to fetch annotations');
+      }
+    } catch (err) {
+      console.error('Error fetching annotations:', err);
+    } finally {
+      setAnnotationsLoading(false);
+    }
+  };
+
+  const handleAnnotationCreate = async (annotation: Omit<Annotation, 'id' | 'created_at'>) => {
+    if (!selectedText) return;
+
+    try {
+      const response = await fetch('http://localhost:3001/api/annotations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text_excerpt_id: selectedText.id,
+          ...annotation,
+        }),
+      });
+
+      if (response.ok) {
+        const newAnnotation = await response.json();
+        setAnnotations(prev => [...prev, newAnnotation]);
+      } else {
+        console.error('Failed to create annotation');
+      }
+    } catch (err) {
+      console.error('Error creating annotation:', err);
+    }
+  };
+
+  const handleAnnotationUpdate = async (id: number, comment: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/annotations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ comment }),
+      });
+
+      if (response.ok) {
+        const updatedAnnotation = await response.json();
+        setAnnotations(prev => prev.map(ann => ann.id === id ? updatedAnnotation : ann));
+      } else {
+        console.error('Failed to update annotation');
+      }
+    } catch (err) {
+      console.error('Error updating annotation:', err);
+    }
+  };
+
+  const handleAnnotationDelete = async (id: number) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/annotations/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setAnnotations(prev => prev.filter(ann => ann.id !== id));
+      } else {
+        console.error('Failed to delete annotation');
+      }
+    } catch (err) {
+      console.error('Error deleting annotation:', err);
+    }
   };
 
   if (loading) {
@@ -91,18 +185,21 @@ const UserPage: React.FC = () => {
 
         <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-lg shadow-sm p-8">
-            <div className="prose max-w-none">
-              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                {selectedText.content}
-              </p>
-            </div>
-            
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-2">How to annotate:</h3>
-              <p className="text-blue-800 text-sm">
-                Select text above to highlight and add annotations. Your annotations will appear below the text.
-              </p>
-            </div>
+            {annotationsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Loading annotations...</span>
+              </div>
+            ) : (
+              <TextAnnotator
+                textId={selectedText.id}
+                content={selectedText.content}
+                annotations={annotations}
+                onAnnotationCreate={handleAnnotationCreate}
+                onAnnotationUpdate={handleAnnotationUpdate}
+                onAnnotationDelete={handleAnnotationDelete}
+              />
+            )}
           </div>
         </div>
       </div>
