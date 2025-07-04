@@ -164,9 +164,9 @@ const UserPage: React.FC = () => {
 
   if (selectedText) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <div className="bg-white shadow">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div>
                 <button
@@ -183,22 +183,24 @@ const UserPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-sm p-8">
+        <div className="flex-1 py-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
+          <div className="max-w-7xl mx-auto h-full">
             {annotationsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <span className="ml-2 text-gray-600">Loading annotations...</span>
               </div>
             ) : (
-              <TextAnnotator
-                textId={selectedText.id}
-                content={selectedText.content}
-                annotations={annotations}
-                onAnnotationCreate={handleAnnotationCreate}
-                onAnnotationUpdate={handleAnnotationUpdate}
-                onAnnotationDelete={handleAnnotationDelete}
-              />
+              <div className="h-full">
+                <TextAnnotator
+                  textId={selectedText.id}
+                  content={selectedText.content}
+                  annotations={annotations}
+                  onAnnotationCreate={handleAnnotationCreate}
+                  onAnnotationUpdate={handleAnnotationUpdate}
+                  onAnnotationDelete={handleAnnotationDelete}
+                />
+              </div>
             )}
           </div>
         </div>

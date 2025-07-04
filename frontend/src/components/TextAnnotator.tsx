@@ -95,6 +95,27 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
     setCommentText('');
   };
 
+  const handleAnnotationClick = (annotation: Annotation) => {
+    // Scroll the annotation into view if possible
+    const textElement = textRef.current;
+    if (!textElement) return;
+
+    // Find the highlighted span for this annotation
+    const spans = textElement.querySelectorAll('span[data-annotation-id]');
+    const targetSpan = Array.from(spans).find(span => 
+      span.getAttribute('data-annotation-id') === annotation.id.toString()
+    );
+
+    if (targetSpan) {
+      targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add a temporary highlight effect
+      targetSpan.classList.add('animate-pulse');
+      setTimeout(() => {
+        targetSpan.classList.remove('animate-pulse');
+      }, 2000);
+    }
+  };
+
   const renderHighlightedText = () => {
     if (!content) return null;
 
@@ -154,6 +175,7 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
         return (
           <span
             key={part.key}
+            data-annotation-id={part.annotation.id}
             className="bg-yellow-200 border-b-2 border-yellow-400 cursor-pointer hover:bg-yellow-300 transition-colors"
             onClick={() => handleEditAnnotation(part.annotation)}
             title={`Comment: ${part.annotation.comment}`}
@@ -167,76 +189,136 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Text content with highlighting */}
-      <div 
-        ref={textRef}
-        className="prose max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap select-text cursor-text"
-        onMouseUp={handleTextSelection}
-      >
-        {renderHighlightedText()}
+    <div className="flex gap-6 h-full">
+      {/* Main text content - Left side */}
+      <div className="flex-1 min-w-0">
+        <div 
+          ref={textRef}
+          className="prose max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap select-text cursor-text bg-white p-6 rounded-lg shadow-sm border"
+          onMouseUp={handleTextSelection}
+        >
+          {renderHighlightedText()}
+        </div>
+        
+        {/* Instructions below text */}
+        <div className="mt-4 bg-blue-50 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">How to annotate:</h3>
+          <ul className="text-blue-800 text-sm space-y-1">
+            <li>• Select any text to create a new annotation</li>
+            <li>• Click on highlighted text to edit existing annotations</li>
+            <li>• Your annotations appear in the sidebar on the right</li>
+          </ul>
+        </div>
       </div>
 
-      {/* Annotations list */}
-      {annotations.length > 0 && (
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Annotations ({annotations.length})
-          </h3>
-          <div className="space-y-3">
-            {annotations.map((annotation) => (
-              <div key={annotation.id} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-sm font-medium text-gray-600">
-                    "{annotation.selected_text}"
-                  </span>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleEditAnnotation(annotation)}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onAnnotationDelete(annotation.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                {editingAnnotation === annotation.id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                      rows={2}
-                      placeholder="Edit your comment..."
-                    />
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleUpdateAnnotation(annotation.id)}
-                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingAnnotation(null)}
-                        className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-700 text-sm">{annotation.comment}</p>
-                )}
+      {/* Annotations sidebar - Right side */}
+      <div className="w-80 flex-shrink-0">
+        <div className="bg-white rounded-lg shadow-sm border h-full flex flex-col">
+          {/* Sidebar header */}
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Annotations ({annotations.length})
+            </h3>
+          </div>
+          
+          {/* Annotations list with scroll */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {annotations.length === 0 ? (
+              <div className="text-center text-gray-500 mt-8">
+                <div className="text-4xl mb-2">📝</div>
+                <p className="text-sm">No annotations yet</p>
+                <p className="text-xs mt-1">Select text to create your first annotation</p>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-4">
+                {annotations
+                  .sort((a, b) => a.start_index - b.start_index)
+                  .map((annotation, index) => (
+                    <div 
+                      key={annotation.id} 
+                      className="bg-gray-50 rounded-lg p-3 border-l-4 border-yellow-400 hover:bg-gray-100 transition-colors cursor-pointer"
+                      onClick={() => handleAnnotationClick(annotation)}
+                      title="Click to highlight this annotation in the text"
+                    >
+                      {/* Annotation number and selected text */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Position {annotation.start_index}
+                          </span>
+                        </div>
+                        <div className="flex space-x-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleEditAnnotation(annotation)}
+                            className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 rounded hover:bg-blue-50"
+                            title="Edit annotation"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => onAnnotationDelete(annotation.id)}
+                            className="text-red-600 hover:text-red-800 text-xs px-2 py-1 rounded hover:bg-red-50"
+                            title="Delete annotation"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Selected text preview */}
+                      <div className="mb-2">
+                        <div className="text-xs text-gray-600 mb-1">Selected text:</div>
+                        <div className="bg-yellow-100 px-2 py-1 rounded text-sm font-medium text-gray-800 border">
+                          "{annotation.selected_text.length > 50 
+                            ? annotation.selected_text.substring(0, 50) + '...' 
+                            : annotation.selected_text}"
+                        </div>
+                      </div>
+                      
+                      {/* Comment section */}
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Comment:</div>
+                        {editingAnnotation === annotation.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={commentText}
+                              onChange={(e) => setCommentText(e.target.value)}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none"
+                              rows={3}
+                              placeholder="Edit your comment..."
+                              autoFocus
+                            />
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handleUpdateAnnotation(annotation.id)}
+                                className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingAnnotation(null)}
+                                className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-700 text-sm bg-white p-2 rounded border">
+                            {annotation.comment || <em className="text-gray-400">No comment</em>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Comment dialog */}
       {showCommentDialog && selectedRange && (
@@ -285,16 +367,6 @@ const TextAnnotator: React.FC<TextAnnotatorProps> = ({
           </div>
         </div>
       )}
-
-      {/* Instructions */}
-      <div className="bg-blue-50 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">How to annotate:</h3>
-        <ul className="text-blue-800 text-sm space-y-1">
-          <li>• Select any text above to create a new annotation</li>
-          <li>• Click on highlighted text to edit existing annotations</li>
-          <li>• Your annotations will be saved automatically</li>
-        </ul>
-      </div>
     </div>
   );
 };
