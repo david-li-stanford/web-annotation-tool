@@ -46,7 +46,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             Admin Login
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Enter any credentials to access the admin dashboard
+            Enter any credentials to access the admin dashboard at /admin/dashboard
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
